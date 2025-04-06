@@ -40,4 +40,9 @@
       <Filter>Resource Files</Filter>
     </Image>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="sol_tray.svg">
+      <Filter>Resource Files</Filter>
+    </None>
+  </ItemGroup>
 </Project>
