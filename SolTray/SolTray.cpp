@@ -13,6 +13,7 @@
 #include <tchar.h>
 #include <timeapi.h>
 
+
 #include <physicalmonitorenumerationapi.h>
 #include <highlevelmonitorconfigurationapi.h>
 
@@ -63,6 +64,46 @@ void print_last_error(void) {
   debug_printf(L"Error: %s", msg);
   LocalFree(msg);
 #endif
+}
+
+// Undocumented stuff to enable dark Mode
+// whatch this https://github.com/microsoft/WindowsAppSDK/issues/41 I guess
+typedef enum _PreferredAppMode {
+  Default,
+  AllowDark,
+  ForceDark,
+  ForceLight,
+  Max
+} PreferredAppMode;
+
+typedef PreferredAppMode(WINAPI *SetPreferredAppModeFunc)(PreferredAppMode);
+
+void enableDarkMode() {
+  HMODULE hUxtheme =
+      LoadLibraryExW(L"uxtheme.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
+  if (hUxtheme) {
+    auto setPreferredAppMode = (SetPreferredAppModeFunc)GetProcAddress(
+        hUxtheme, MAKEINTRESOURCEA(135));
+    if (setPreferredAppMode) {
+      setPreferredAppMode(AllowDark);
+    }
+    FreeLibrary(hUxtheme);
+  }
+}
+
+bool isDarkModeEnabled() {
+  DWORD value = 1; // default to light
+  HKEY hKey;
+  if (RegOpenKeyExW(
+          HKEY_CURRENT_USER,
+          L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+          0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+    DWORD size = sizeof(value);
+    RegQueryValueExW(hKey, L"AppsUseLightTheme", nullptr, nullptr,
+                     (LPBYTE)&value, &size);
+    RegCloseKey(hKey);
+  }
+  return value == 0; // 0 = dark mode
 }
 
 int __stdcall monitor_enum_proc(HMONITOR hMonitor, HDC _device_context,
@@ -124,8 +165,6 @@ void set_monitor_brightness_tooltip(int brightness) {
   }
   last_tooltip_update = timeGetTime();
 }
-
-
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT Message, WPARAM wParam,
     LPARAM lParam) {
@@ -251,7 +290,7 @@ LRESULT CALLBACK cbMouseHook(int nCode, WPARAM wParam, LPARAM lParam) {
 }
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
-    LPSTR lpCmdLine, int nCmdShow) {
+                   LPSTR lpCmdLine, int nCmdShow) {
   auto hMutexInstance = CreateMutexW(NULL, FALSE, L"SolTrayMutex");
   if (hMutexInstance == NULL && (GetLastError() == ERROR_ALREADY_EXISTS ||
                                  GetLastError() == ERROR_ACCESS_DENIED)) {
@@ -273,8 +312,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
                  .hbrBackground = (HBRUSH)GetStockObject(WHITE_BRUSH),
                  .lpszMenuName = NULL,
                  .lpszClassName = L"SolTray",
-                 .hIconSm =
-                     LoadIcon(hInstance, MAKEINTRESOURCEW(IDI_SOLTRAY))};
+                 .hIconSm = LoadIcon(hInstance, MAKEINTRESOURCEW(IDI_SOLTRAY))};
 
   if (!RegisterClassExW(&wc)) {
     print_last_error();
@@ -290,7 +328,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     return -2;
   }
 
+  enableDarkMode();
+
   GUID nidGUID = {0xffe22b0e, 0xa792, 0x4c81, {0x9b, 0x20, 0xeb, 0x8e, 0x8f, 0x26, 0x1e, 0x41}};
+
+  int icon_id = isDarkModeEnabled() ? IDI_SOLTRAY_DARK : IDI_SOLTRAY;
 
   structNID = {
       .cbSize = sizeof(NOTIFYICONDATAW),
@@ -298,7 +340,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
       .uID = IDI_SOLTRAY,
       .uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP | NIF_SHOWTIP | NIF_GUID,
       .uCallbackMessage = WM_USER_SHELLICON,
-      .hIcon = LoadIconW(hInstance, MAKEINTRESOURCEW(IDI_SOLTRAY)),
+      .hIcon = LoadIconW(hInstance, MAKEINTRESOURCEW(icon_id)),
       .szTip = L"SolTray Tip",
       .uVersion = NOTIFYICON_VERSION_4,
       .guidItem = nidGUID,
@@ -345,4 +387,4 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
   }
 
   return msg.wParam;
-}
+}   

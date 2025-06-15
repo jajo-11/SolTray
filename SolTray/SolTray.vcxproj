@@ -148,12 +148,8 @@
     <ResourceCompile Include="SolTray.rc" />
   </ItemGroup>
   <ItemGroup>
-    <Image Include="icon1.ico" />
-    <Image Include="small.ico" />
     <Image Include="SolTray.ico" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="sol_tray.svg" />
+    <Image Include="soltray_dark.ico" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
